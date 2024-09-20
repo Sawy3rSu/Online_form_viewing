@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>待取信息管理</title>
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.11.5/css/jquery.dataTables.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        #loginContainer, #managementContainer {
+            margin-top: 20px;
+        }
+        #loginMessage {
+            color: red;
+        }
+        .hidden {
+            display: none;
+        }
+        .form-container {
+            margin-bottom: 20px;
+        }
+        .form-container input, .form-container button {
+            margin-right: 10px;
+        }
+        .edit-form {
+            margin-top: 20px;
+        }
+		h1 {
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="loginContainer">
+        <h1>登录</h1>
+        <div class="form-container">
+            <input type="text" id="username" placeholder="用户名">
+            <input type="password" id="password" placeholder="密码">
+            <button onclick="login()">登录</button>
+        </div>
+        <p id="loginMessage"></p>
+    </div>
+
+    <div id="managementContainer" class="hidden">
+        <h1>待取信息管理</h1>
+        <div class="form-container">
+            <input type="text" id="newDate" placeholder="收件日期">
+            <input type="text" id="newRecipient" placeholder="收件人">
+            <input type="text" id="newType" placeholder="收件类型">
+            <button onclick="addData()">新增数据</button>
+        </div>
+        <div id="excelTableContainer">
+            <table id="dataTable" class="display">
+                <thead>
+                    <tr>
+                        <th>收件日期</th>
+                        <th>收件人</th>
+                        <th>收件类型</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- 数据将通过 JavaScript 动态插入 -->
+                </tbody>
+            </table>
+        </div>
+        <div id="editForm" class="hidden edit-form">
+            <h2>编辑数据</h2>
+            <input type="hidden" id="editIndex">
+            <input type="text" id="editDate" placeholder="收件日期">
+            <input type="text" id="editRecipient" placeholder="收件人">
+            <input type="text" id="editType" placeholder="收件类型">
+            <button onclick="saveData()">保存</button>
+            <button onclick="cancelEdit()">取消</button>
+        </div>
+    </div>
+    
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.js"></script>
+    <script>
+        // 登录功能
+        function login() {
+            const username = $('#username').val();
+            const password = $('#password').val();
+            $.post('/auth/login', { username, password }, function() {
+                $('#loginContainer').addClass('hidden');
+                $('#managementContainer').removeClass('hidden');
+                loadTableData();
+            }).fail(function() {
+                $('#loginMessage').text('用户名或密码错误');
+            });
+        }
+
+        // 加载表格数据
+        function loadTableData() {
+            $('#dataTable').DataTable({
+                "ajax": {
+                    "url": "/api/data",
+                    "dataSrc": ""
+                },
+                "columns": [
+                    { "data": "收件日期" },
+                    { "data": "收件人" },
+                    { "data": "收件类型" },
+                    {
+                        "data": null,
+                        "defaultContent": '<button class="edit">编辑</button> <button class="delete">删除</button>',
+                        "orderable": false
+                    }
+                ]
+            });
+        }
+
+        // 新增数据
+        function addData() {
+            const newDate = $('#newDate').val();
+            const newRecipient = $('#newRecipient').val();
+            const newType = $('#newType').val();
+            $.post('/api/data', { "收件日期": newDate, "收件人": newRecipient, "收件类型": newType }, function() {
+                $('#dataTable').DataTable().ajax.reload();
+            });
+        }
+
+        // 编辑数据
+        $(document).on('click', '#dataTable .edit', function() {
+            const row = $(this).closest('tr');
+            const data = $('#dataTable').DataTable().row(row).data();
+            $('#editIndex').val($('#dataTable').DataTable().row(row).index());
+            $('#editDate').val(data["收件日期"]);
+            $('#editRecipient').val(data["收件人"]);
+            $('#editType').val(data["收件类型"]);
+            $('#editForm').removeClass('hidden');
+        });
+
+        // 保存编辑数据
+        function saveData() {
+            const index = $('#editIndex').val();
+            const updatedData = {
+                "收件日期": $('#editDate').val(),
+                "收件人": $('#editRecipient').val(),
+                "收件类型": $('#editType').val()
+            };
+            $.ajax({
+                url: `/api/data/${index}`,
+                type: 'PUT',
+                contentType: 'application/json',
+                data: JSON.stringify(updatedData),
+                success: function() {
+                    $('#dataTable').DataTable().ajax.reload();
+                    $('#editForm').addClass('hidden');
+                }
+            });
+        }
+
+        // 取消编辑
+        function cancelEdit() {
+            $('#editForm').addClass('hidden');
+        }
+
+        // 删除数据
+        $(document).on('click', '#dataTable .delete', function() {
+            const row = $(this).closest('tr');
+            const index = $('#dataTable').DataTable().row(row).index();
+            $.ajax({
+                url: `/api/data/${index}`,
+                type: 'DELETE',
+                success: function() {
+                    $('#dataTable').DataTable().ajax.reload();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
